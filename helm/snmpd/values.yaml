@@ -1,0 +1,36 @@
+image:
+  repository: ghcr.io/inputobject2/snmpd:latest
+  tag: latest
+  pullPolicy: IfNotPresent
+
+config:
+  snmpdConfig: |
+    # Change "public" on the line below to your preferred SNMP community string
+    com2sec readonly  default         public
+
+    group MyROGroup v2c        readonly
+    view all    included  .1                               80
+    access MyROGroup ""      any       noauth    exact  all    none   none
+
+    syslocation Rack, Room, Building, City, Country [GPSX,Y]
+    syscontact Your Name <your@email.address>
+
+ports:
+  - name: snmp-tcp
+    containerPort: 161
+    hostPort: 161
+    protocol: TCP
+  - name: snmp-trap-tcp
+    containerPort: 162
+    hostPort: 162
+    protocol: TCP
+  - name: snmp-udp
+    containerPort: 161
+    hostPort: 161
+    protocol: UDP
+  - name: snmp-trap-udp
+    containerPort: 162
+    hostPort: 162
+    protocol: UDP
+
+nodeSelector: {}

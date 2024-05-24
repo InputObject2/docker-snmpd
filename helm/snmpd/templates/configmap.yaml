@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: snmpd-config
+data:
+  snmpd.conf: |-
+{{ .Values.config.snmpdConfig | indent 4 }}
