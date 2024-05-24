@@ -1,0 +1,6 @@
+apiVersion: v2
+name: snmpd
+appVersion: "5.9.4"
+version: "1.0.0"
+type: application
+description: A Helm chart for deploying snmpd as a DaemonSet

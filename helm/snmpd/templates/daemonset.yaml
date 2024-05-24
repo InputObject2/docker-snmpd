@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ .Chart.Name }}
+spec:
+  selector:
+    matchLabels:
+      app: snmpd
+  template:
+    metadata:
+      labels:
+        app: snmpd
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      hostNetwork: true
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      containers:
+      - name: snmpd
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        {{- range .Values.ports }}
+        - name: {{ .name }}
+          containerPort: {{ .containerPort }}
+          hostPort: {{ .hostPort }}
+          protocol: {{ .protocol }}
+        {{- end }}
+        volumeMounts:
+        - name: snmpd-config
+          mountPath: /etc/snmp/snmpd.conf
+          subPath: snmpd.conf
+        - name: host-proc
+          mountPath: /host_proc
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+          allowPrivilegeEscalation: true
+      volumes:
+      - name: snmpd-config
+        configMap:
+          name: {{ .Chart.Name }}-config
+      - name: host-proc
+        hostPath:
+          path: /proc
