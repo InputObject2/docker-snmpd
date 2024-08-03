@@ -16,6 +16,8 @@ spec:
       hostNetwork: true
       nodeSelector:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
       containers:
       - name: snmpd
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
