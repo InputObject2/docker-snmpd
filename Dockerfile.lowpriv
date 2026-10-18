@@ -1,0 +1,71 @@
+
+# Pin the base image and Net-SNMP version for reproducible builds.
+FROM debian:bookworm-slim
+
+ARG SNMPD_VERSION=5.9.4
+
+# Install build dependencies.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+        ca-certificates \
+        libssl-dev \
+        libperl-dev \
+        libwrap0-dev \
+        libreadline-dev \
+        libsnmp-dev \
+        file \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create the configuration directory and download Net-SNMP.
+WORKDIR /usr/src
+RUN mkdir -p /etc/snmp \
+    && curl -fL \
+        "https://sourceforge.net/projects/net-snmp/files/net-snmp/${SNMPD_VERSION}/net-snmp-${SNMPD_VERSION}.tar.gz/download" \
+        -o net-snmp.tar.gz \
+    && tar -xzf net-snmp.tar.gz \
+    && rm net-snmp.tar.gz
+
+# Build Net-SNMP with host proc filesystem references.
+RUN cd "/usr/src/net-snmp-${SNMPD_VERSION}" \
+    && find . -type f -print0 \
+        | xargs -0 sed -i 's|\"/proc/|\"/host_proc/|g' \
+    && ./configure \
+        --prefix=/usr/local \
+        --disable-ipv6 \
+        --disable-snmpv1 \
+        --with-defaults \
+    && make -j"$(nproc)" \
+    && make install \
+    && cd / \
+    && rm -rf "/usr/src/net-snmp-${SNMPD_VERSION}"
+
+# Create a dedicated non-root runtime identity.
+RUN groupadd --system --gid 10001 snmpd \
+    && useradd --system \
+        --uid 10001 \
+        --gid 10001 \
+        --no-create-home \
+        --home-dir /nonexistent \
+        --shell /usr/sbin/nologin \
+        snmpd \
+    && mkdir -p /var/lib/snmp /var/run/snmpd /tmp \
+    && chown -R 10001:10001 /var/lib/snmp /var/run/snmpd /tmp \
+    && chmod 1777 /tmp
+
+# Remove build dependencies while retaining runtime libraries.
+RUN apt-get purge -y --auto-remove \
+        build-essential \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install the supplied configuration as a read-only runtime file.
+COPY --chown=0:0 snmpd.conf /etc/snmp/snmpd.conf
+RUN chmod 0444 /etc/snmp/snmpd.conf
+
+# SNMP polling ports.
+EXPOSE 161/udp 161/tcp
+
+ENTRYPOINT ["/usr/local/sbin/snmpd"]
+CMD ["-f", "-c", "/etc/snmp/snmpd.conf"]
